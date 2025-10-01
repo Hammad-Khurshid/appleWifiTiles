@@ -1,0 +1,13 @@
+map.html
+*.wiki
+.DS_Store
+cert.*
+bin
+*.log
+*.zst
+*.gob
+*.db
+__pycache__
+venv
+points/*.txt
+*.bin

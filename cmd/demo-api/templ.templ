@@ -1,0 +1,36 @@
+package main
+
+import "fmt"
+
+templ Index(lat, long float64, china bool) {
+	<html>
+		<head>
+			<link
+				rel="stylesheet"
+				href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+				integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+				crossorigin=""
+			/>
+			<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+			<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js" integrity="sha512-iJs/hgHOlo6Eo8i+nYtuEPa+CZ6E3C2Z0s1LkSuvLtclMQlqmxPjP6XaXDi0Ki6NsUuQ2Zmo0UeFOLSgjbv5+A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+			<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js" integrity="sha512-GsAYl1wxzWW6azVpXkhyYfjMb2LbaOnlrqWMBdAk9xDcilinFvGMN+48Ajp/10u/9lcnh8YyS2CYNgung7ewHg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+			<style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 80vh;
+      }
+    </style>
+			<title>Interactive WLOC Demo</title>
+		</head>
+		<body>
+			<div id="map"></div>
+			<div id="long" data-name={ fmt.Sprintf("%f", long) }></div>
+			<div id="lat" data-name={ fmt.Sprintf("%f", lat) }></div>
+			<div id="china" data-name={ fmt.Sprintf("%t", china) }></div>
+			<script src="/main.js"></script>
+		</body>
+	</html>
+}

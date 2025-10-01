@@ -1,0 +1,5 @@
+data
+*.flow
+*.json
+icon_cache
+venv

@@ -100,15 +100,19 @@ func QueryBssid(bssids []string, maxResults int32, options ...Modifier) ([]AP, e
 		long := CoordFromInt(d.GetLocation().GetLongitude(), -8)
 		lat := CoordFromInt(d.GetLocation().GetLatitude(), -8)
 		alt := CoordFromInt(d.GetLocation().GetAltitude(), -8)
+		horizontalAccuracy := CoordFromInt(d.GetLocation().GetHorizontalAccuracy(), 0) // Use raw value (meters)
+		verticalAccuracy := CoordFromInt(d.GetLocation().GetUnknownValue4(), 0)        // Use field 4 (unknown_value4) for vertical accuracy, raw value (meters)
 		if long == -180 && lat == -180 {
 			continue
 		}
 		resp[i] = AP{
 			BSSID: d.GetBssid(),
 			Location: Location{
-				Long: long,
-				Lat:  lat,
-				Alt:  alt,
+				Long:               long,
+				Lat:                lat,
+				Alt:                alt,
+				HorizontalAccuracy: horizontalAccuracy,
+				VerticalAccuracy:   verticalAccuracy,
 			},
 		}
 		i++

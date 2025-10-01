@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"regexp"
 	"strconv"
@@ -26,16 +27,23 @@ const (
 )
 
 type WiFiRecord struct {
-	BSSID     string  `json:"bssid"`
-	Timestamp int64   `json:"timestamp"`
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
+	BSSID                    string  `json:"bssid"`
+	Timestamp                int64   `json:"timestamp"`
+	Latitude                 float64 `json:"latitude"`
+	Longitude                float64 `json:"longitude"`
+	HorizontalAccuracy       float64 `json:"horizontal_accuracy"`
+	VerticalAccuracy         float64 `json:"vertical_accuracy"`
+	HorizontalAccuracyMeters int     `json:"horizontal_accuracy_meters"`
+	VerticalAccuracyMeters   int     `json:"vertical_accuracy_meters"`
 }
 
-type AP struct {
-	BSSID     string
-	Latitude  float64
-	Longitude float64
+// Remove local AP struct - we'll use lib.AP instead
+
+// accuracyToMeters converts accuracy values to integer meters
+// Apple returns accuracy in meters, so we just need to round to integer
+func accuracyToMeters(accuracy float64) int {
+	// Round to nearest integer (Apple returns accuracy in meters)
+	return int(math.Round(accuracy))
 }
 
 func main() {
@@ -134,14 +142,14 @@ func loadProcessedBSSIDs() (map[string]struct{}, error) {
 	return processed, nil
 }
 
-func loadSeedBSSIDs() ([]AP, error) {
+func loadSeedBSSIDs() ([]lib.AP, error) {
 	file, err := os.Open("us_aps.txt")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open seed BSSIDs file: %w", err)
 	}
 	defer file.Close()
 
-	var seedBSSIDs []AP
+	var seedBSSIDs []lib.AP
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -174,10 +182,15 @@ func loadSeedBSSIDs() ([]AP, error) {
 			continue
 		}
 
-		seedBSSIDs = append(seedBSSIDs, AP{
-			BSSID:     bssid,
-			Latitude:  lat,
-			Longitude: lon,
+		seedBSSIDs = append(seedBSSIDs, lib.AP{
+			BSSID: bssid,
+			Location: lib.Location{
+				Long:               lon,
+				Lat:                lat,
+				Alt:                0, // We don't have altitude data from the seed file
+				HorizontalAccuracy: 0, // We don't have accuracy data from the seed file
+				VerticalAccuracy:   0, // We don't have accuracy data from the seed file
+			},
 		})
 	}
 
@@ -189,8 +202,8 @@ func loadSeedBSSIDs() ([]AP, error) {
 	return seedBSSIDs, nil
 }
 
-func createBSSIDQueue(seedBSSIDs []AP, processedBSSIDs map[string]struct{}) []AP {
-	var queue []AP
+func createBSSIDQueue(seedBSSIDs []lib.AP, processedBSSIDs map[string]struct{}) []lib.AP {
+	var queue []lib.AP
 
 	for _, ap := range seedBSSIDs {
 		if _, processed := processedBSSIDs[ap.BSSID]; !processed {
@@ -201,9 +214,9 @@ func createBSSIDQueue(seedBSSIDs []AP, processedBSSIDs map[string]struct{}) []AP
 	return queue
 }
 
-func crawlBSSIDs(queue []AP, processedBSSIDs map[string]struct{}) {
+func crawlBSSIDs(queue []lib.AP, processedBSSIDs map[string]struct{}) {
 	// Create channels
-	bssidChan := make(chan AP, numWorkers)
+	bssidChan := make(chan lib.AP, numWorkers)
 	resultsChan := make(chan []WiFiRecord, numWorkers)
 	processedChan := make(chan string, numWorkers)
 
@@ -295,11 +308,19 @@ func crawlBSSIDs(queue []AP, processedBSSIDs map[string]struct{}) {
 
 				var records []WiFiRecord
 				for _, neighbor := range neighbors {
+					// Convert accuracy to integer meters (Apple returns accuracy in meters)
+					horizontalAccuracyMeters := accuracyToMeters(neighbor.Location.HorizontalAccuracy)
+					verticalAccuracyMeters := accuracyToMeters(neighbor.Location.VerticalAccuracy)
+
 					records = append(records, WiFiRecord{
-						BSSID:     neighbor.BSSID,
-						Timestamp: time.Now().UnixMilli(),
-						Latitude:  neighbor.Latitude,
-						Longitude: neighbor.Longitude,
+						BSSID:                    neighbor.BSSID,
+						Timestamp:                time.Now().UnixMilli(),
+						Latitude:                 neighbor.Location.Lat,
+						Longitude:                neighbor.Location.Long,
+						HorizontalAccuracy:       neighbor.Location.HorizontalAccuracy,
+						VerticalAccuracy:         neighbor.Location.VerticalAccuracy,
+						HorizontalAccuracyMeters: horizontalAccuracyMeters,
+						VerticalAccuracyMeters:   verticalAccuracyMeters,
 					})
 				}
 
@@ -327,9 +348,9 @@ func crawlBSSIDs(queue []AP, processedBSSIDs map[string]struct{}) {
 	log.Printf("Deep crawl completed! Total records: %d", totalRecords)
 }
 
-func getNeighborsWithRetry(bssid string, retries int) ([]AP, error) {
+func getNeighborsWithRetry(bssid string, retries int) ([]lib.AP, error) {
 	var err error
-	var neighbors []AP
+	var neighbors []lib.AP
 
 	for attempt := 0; attempt < retries; attempt++ {
 		neighbors, err = getNeighbors(bssid)
@@ -346,20 +367,11 @@ func getNeighborsWithRetry(bssid string, retries int) ([]AP, error) {
 	return nil, fmt.Errorf("failed after %d attempts: %w", retries, err)
 }
 
-func getNeighbors(bssid string) ([]AP, error) {
+func getNeighbors(bssid string) ([]lib.AP, error) {
 	blocks, err := lib.QueryBssid([]string{bssid}, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	var neighbors []AP
-	for _, block := range blocks {
-		neighbors = append(neighbors, AP{
-			BSSID:     block.BSSID,
-			Latitude:  block.Location.Lat,
-			Longitude: block.Location.Long,
-		})
-	}
-
-	return neighbors, nil
+	return blocks, nil
 }

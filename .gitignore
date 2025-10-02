@@ -11,3 +11,4 @@ __pycache__
 venv
 points/*.txt
 *.bin
+push_to_dynamo.go
